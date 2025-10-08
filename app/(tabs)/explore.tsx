@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -11,91 +11,42 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useCountryStore } from "@/store/useCountryStore";
 
 export default function TabTwoScreen() {
-  const countries = [
-    {
-      id: "1",
-      name: "Indonesia",
-      capital: "Jakarta",
-      continent: "Asia",
-      flag: "🇮🇩",
-    },
-    {
-      id: "2",
-      name: "Malaysia",
-      capital: "Kuala Lumpur",
-      continent: "Asia",
-      flag: "🇲🇾",
-    },
-    {
-      id: "3",
-      name: "Singapore",
-      capital: "Singapore",
-      continent: "Asia",
-      flag: "🇸🇬",
-    },
-    {
-      id: "4",
-      name: "Germany",
-      capital: "Berlin",
-      continent: "Europe",
-      flag: "🇩🇪",
-    },
-    {
-      id: "5",
-      name: "France",
-      capital: "Paris",
-      continent: "Europe",
-      flag: "🇫🇷",
-    },
-    {
-      id: "6",
-      name: "Brazil",
-      capital: "Brasília",
-      continent: "South America",
-      flag: "🇧🇷",
-    },
-    {
-      id: "7",
-      name: "Canada",
-      capital: "Ottawa",
-      continent: "North America",
-      flag: "🇨🇦",
-    },
-    {
-      id: "8",
-      name: "Australia",
-      capital: "Canberra",
-      continent: "Oceania",
-      flag: "🇦🇺",
-    },
-  ];
-
-  const [searchText, setSearchText] = useState("");
-  const [toggle, setToggle] = useState("list");
-
   const router = useRouter();
 
-  const filteredCountries = countries.filter(
-    (country) =>
-      country.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      country.capital.toLowerCase().includes(searchText.toLowerCase())
-  );
+  // Get state and actions from Zustand store
+  const countries = useCountryStore((state) => state.countries);
+  const searchText = useCountryStore((state) => state.searchText);
+  const toggle = useCountryStore((state) => state.toggle);
+  const setSearchText = useCountryStore((state) => state.setSearchText);
+  const setToggle = useCountryStore((state) => state.setToggle);
 
-  const groupedCountries = countries.reduce((acc: any, country: any) => {
-    const continent = country.continent;
-    const existingGroup: any = acc.find((g: any) => g.continent === continent);
-    if (existingGroup) {
-      existingGroup.data.push(country);
-    } else {
-      acc.push({
-        continent,
-        data: [country],
-      });
-    }
-    return acc;
-  }, []);
+  // Compute derived values with useMemo
+  const filteredCountries = useMemo(() => {
+    return countries.filter(
+      (country) =>
+        country.name.toLowerCase().includes(searchText.toLowerCase()) ||
+        country.capital.toLowerCase().includes(searchText.toLowerCase())
+    );
+  }, [countries, searchText]);
+
+  const groupedCountries = useMemo(() => {
+    return countries.reduce((acc: any, country: any) => {
+      const continent = country.continent;
+      const existingGroup: any = acc.find((g: any) => g.continent === continent);
+      if (existingGroup) {
+        existingGroup.data.push(country);
+      } else {
+        acc.push({
+          continent,
+          data: [country],
+        });
+      }
+      return acc;
+    }, []);
+  }, [countries]);
 
   const renderCountryItem = ({ item }: any) => (
     <TouchableOpacity
