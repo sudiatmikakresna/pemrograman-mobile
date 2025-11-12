@@ -1,4 +1,5 @@
-import { create } from 'zustand';
+import { create } from "zustand";
+import { supabase } from "../lib/supabase";
 
 export interface Country {
   id: string;
@@ -6,100 +7,118 @@ export interface Country {
   capital: string;
   continent: string;
   flag: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface CountryStore {
   countries: Country[];
   searchText: string;
-  toggle: 'list' | 'continent';
+  toggle: "list" | "continent";
+  isLoading: boolean;
+  error: string | null;
 
   // Actions
   setSearchText: (text: string) => void;
-  setToggle: (toggle: 'list' | 'continent') => void;
-  addCountry: (country: Country) => void;
-  removeCountry: (id: string) => void;
-  updateCountry: (id: string, country: Partial<Country>) => void;
+  setToggle: (toggle: "list" | "continent") => void;
+  fetchCountries: () => Promise<void>;
+  addCountry: (
+    country: Omit<Country, "id" | "created_at" | "updated_at">
+  ) => Promise<void>;
+  removeCountry: (id: string) => Promise<void>;
+  updateCountry: (id: string, country: Partial<Country>) => Promise<void>;
 }
 
 export const useCountryStore = create<CountryStore>((set, get) => ({
-  countries: [
-    {
-      id: "1",
-      name: "Indonesia",
-      capital: "Jakarta",
-      continent: "Asia",
-      flag: "🇮🇩",
-    },
-    {
-      id: "2",
-      name: "Malaysia",
-      capital: "Kuala Lumpur",
-      continent: "Asia",
-      flag: "🇲🇾",
-    },
-    {
-      id: "3",
-      name: "Singapore",
-      capital: "Singapore",
-      continent: "Asia",
-      flag: "🇸🇬",
-    },
-    {
-      id: "4",
-      name: "Germany",
-      capital: "Berlin",
-      continent: "Europe",
-      flag: "🇩🇪",
-    },
-    {
-      id: "5",
-      name: "France",
-      capital: "Paris",
-      continent: "Europe",
-      flag: "🇫🇷",
-    },
-    {
-      id: "6",
-      name: "Brazil",
-      capital: "Brasília",
-      continent: "South America",
-      flag: "🇧🇷",
-    },
-    {
-      id: "7",
-      name: "Canada",
-      capital: "Ottawa",
-      continent: "North America",
-      flag: "🇨🇦",
-    },
-    {
-      id: "8",
-      name: "Australia",
-      capital: "Canberra",
-      continent: "Oceania",
-      flag: "🇦🇺",
-    },
-  ],
+  countries: [],
   searchText: "",
   toggle: "list",
+  isLoading: false,
+  error: null,
 
   // Actions
   setSearchText: (text) => set({ searchText: text }),
 
   setToggle: (toggle) => set({ toggle }),
 
-  addCountry: (country) =>
-    set((state) => ({ countries: [...state.countries, country] })),
+  // Fetch all countries from Supabase
+  fetchCountries: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from("countries")
+        .select("*")
+        .order("created_at", { ascending: true });
 
-  removeCountry: (id) =>
-    set((state) => ({
-      countries: state.countries.filter((c) => c.id !== id),
-    })),
+      if (error) throw error;
 
-  updateCountry: (id, updatedCountry) =>
-    set((state) => ({
-      countries: state.countries.map((c) =>
-        c.id === id ? { ...c, ...updatedCountry } : c
-      ),
-    })),
+      set({ countries: data || [], isLoading: false });
+    } catch (error: any) {
+      set({ error: error.message, isLoading: false });
+      console.error("Error fetching countries:", error);
+    }
+  },
+
+  // Add a new country to Supabase
+  addCountry: async (country) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from("countries")
+        .insert([country])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      set((state) => ({
+        countries: [...state.countries, data],
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      set({ error: error.message, isLoading: false });
+      console.error("Error adding country:", error);
+    }
+  },
+
+  // Remove a country from Supabase
+  removeCountry: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { error } = await supabase.from("countries").delete().eq("id", id);
+
+      if (error) throw error;
+
+      set((state) => ({
+        countries: state.countries.filter((c) => c.id !== id),
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      set({ error: error.message, isLoading: false });
+      console.error("Error removing country:", error);
+    }
+  },
+
+  // Update a country in Supabase
+  updateCountry: async (id, updatedCountry) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from("countries")
+        .update({ ...updatedCountry, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      set((state) => ({
+        countries: state.countries.map((c) => (c.id === id ? data : c)),
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      set({ error: error.message, isLoading: false });
+      console.error("Error updating country:", error);
+    }
+  },
 }));
